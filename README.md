@@ -1,2 +1,5 @@
 # SUSY
-hw4
+STAT418 HW4
+
+##Name: Rui Qiao
+##UCLA ID: 704878262
