@@ -1,0 +1,253 @@
+---
+title: "NN_models"
+author: "Rui Qiao"
+date: "6/7/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Loading and Preparation
+
+```{r data}
+# h2o.shutdown()
+library(h2o)
+
+h2o.init(nthreads = -1)
+
+col_names <- c("class", "MET_rel", "axial MET", "M_R", "M_TR_2", "R", 
+               "MT2", "S_R", "M_Delta_R", "dPhi_r_b", "cos(theta_r1)")
+
+SUSY <- h2o.importFile("/Users/Rachel/Desktop/STAT418/SUSY/SUSY_high_aa",
+                       destination_frame = "SUSY", col.names = col_names)
+
+y <- "class"
+x <- setdiff(names(SUSY),y)
+
+# For binary classification, response should be a factor
+SUSY[y] <- as.factor(SUSY[y])
+summary(SUSY[y])
+# 1 for signal, 0 for background
+
+# Split Data: train-valid-test
+# Do not use cross-validation, dataset is large enough
+parts <- h2o.splitFrame(SUSY, c(0.8,0.1), seed = 123)
+SUSY_train <- parts[[1]]
+SUSY_valid <- parts[[2]]
+SUSY_test <- parts[[3]]
+rm(parts)
+
+```
+
+
+## Neutral Networks
+
+Try various architectures, tricks (initialization, regularization, momentum, adaptive learning rate etc.).Use early stopping.
+
+```{r NN}
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         ## DEFAULT: activation = "Rectifier", hidden = c(200,200), 
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(50,50,50,50), input_dropout_ratio = 0.2,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(50,50,50,50), 
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(20,20),
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(20),
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(5),
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(1),
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), l1 = 1e-5, l2 = 1e-5, 
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "RectifierWithDropout", hidden = c(200,200,200,200), hidden_dropout_ratios=c(0.2,0.1,0.1,0),
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         rho = 0.95, epsilon = 1e-06,  ## default:  rho = 0.99, epsilon = 1e-08
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         rho = 0.999, epsilon = 1e-08,  ## default:  rho = 0.99, epsilon = 1e-08
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         rho = 0.9999, epsilon = 1e-08,  ## default:  rho = 0.99, epsilon = 1e-08
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         rho = 0.999, epsilon = 1e-06,  ## default:  rho = 0.99, epsilon = 1e-08
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         rho = 0.999, epsilon = 1e-09,  ## default:  rho = 0.99, epsilon = 1e-08
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, ## default: rate = 0.005, rate_decay = 1, momentum_stable = 0,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.001, momentum_start = 0.5, momentum_ramp = 1e5, momentum_stable = 0.99,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.01, momentum_start = 0.5, momentum_ramp = 1e5, momentum_stable = 0.99,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.01, rate_annealing = 1e-05, 
+                         momentum_start = 0.5, momentum_ramp = 1e5, momentum_stable = 0.99,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.01, rate_annealing = 1e-04, 
+                         momentum_start = 0.5, momentum_ramp = 1e5, momentum_stable = 0.99,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.01, rate_annealing = 1e-05, 
+                         momentum_start = 0.5, momentum_ramp = 1e5, momentum_stable = 0.9,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+
+
+
+system.time({
+  md <- h2o.deeplearning(x = x, y = y, training_frame = SUSY_train, validation_frame = SUSY_valid,
+                         activation = "Rectifier", hidden = c(200,200), 
+                         adaptive_rate = FALSE, rate = 0.01, rate_annealing = 1e-05, 
+                         momentum_start = 0.5, momentum_ramp = 1e4, momentum_stable = 0.9,
+                         epochs = 100, stopping_rounds = 2, stopping_metric = "AUC", stopping_tolerance = 0) 
+})
+h2o.performance(md, SUSY_test)@metrics$AUC
+```
+
